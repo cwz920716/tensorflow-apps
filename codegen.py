@@ -104,6 +104,17 @@ class PyAssign(Op):
     def codegen(self):
         return self.lvalue.codegen() + ' = ' + self.rvalue.codegen()
 
+class PyKeywordArg(Op):
+    def __init__(self, lvalue, rvalue):
+        self.op = '='
+        # lvalue *must* be a symbol
+        self.lvalue = lvalue
+        self.rvalue = rvalue
+        self.args = [lvalue, rvalue]
+
+    def codegen(self):
+        return self.lvalue.codegen() + '=' + self.rvalue.codegen()
+
 class PyGetMember(Op):
     def __init__(self, obj, member):
         self.op = '.'
@@ -125,7 +136,7 @@ class PyGetItem(Op):
         return self.array.codegen() + '[' + self.index.codegen() + ']'
 
 def codegen_bb(bb):
-    code = '#generate from basic block\n'
+    code = '# generate from basic block\n'
     for i in bb:
         code = code + i.codegen() + '\n'
     return code
@@ -144,17 +155,61 @@ def model_build():
     transfer = Symbol('transfer')
     inst = PyAssign(PyGetMember(self_, transfer), transfer_function)
     bb.append(inst)
+
+    # variables
     weights = Symbol('weights')
+    all_weights = Symbol('all_weights')
     _initialize_weights = Symbol('_initialize_weights')
-    inst = PyAssign(PyGetMember(self_, weights), PyCall(PyGetMember(self_, _initialize_weights), []))
+    dict_ = Symbol('dict')
+    inst = PyAssign(all_weights, PyCall(dict_, []))
+    bb.append(inst)
+    
+    # variables
+    tf_variable = Symbol('tf.Variable')
+    w1 = StringLiteral('w1')
+    b1 = StringLiteral('b1')
+    w2 = StringLiteral('w2')
+    b2 = StringLiteral('b2')
+    autoencoder_Utils_xavier_init = Symbol('autoencoder.Utils.xavier_init')
+    inst = TFOperation(tf_variable, [
+                       TFOperation(autoencoder_Utils_xavier_init, [
+                                   PyGetMember(self_, n_input),
+                                   PyGetMember(self_, n_hidden)
+                                   ])
+                       ], name=PyGetItem(all_weights, w1))
+    bb.append(inst)
+    tf_zeros = Symbol('tf.zeros')
+    tf_float32 = Symbol('tf.float32')
+    dtype = Symbol('dtype')
+    inst = TFOperation(tf_variable, [
+                       TFOperation(tf_zeros, [
+                                   ListLiteral([PyGetMember(self_, n_hidden)]),
+                                   PyKeywordArg(dtype, tf_float32)
+                                   ])
+                       ], name=PyGetItem(all_weights, b1))
+    bb.append(inst)
+    inst = TFOperation(tf_variable, [
+                       TFOperation(tf_zeros, [
+                                   ListLiteral([PyGetMember(self_, n_hidden), PyGetMember(self_, n_input)]),
+                                   PyKeywordArg(dtype, tf_float32)
+                                   ])
+                       ], name=PyGetItem(all_weights, w2))
+    bb.append(inst)
+    inst = TFOperation(tf_variable, [
+                       TFOperation(tf_zeros, [
+                                   ListLiteral([PyGetMember(self_, n_input)]),
+                                   PyKeywordArg(dtype, tf_float32)
+                                   ])
+                       ], name=PyGetItem(all_weights, b2))
+    bb.append(inst)
+    inst = PyAssign(PyGetMember(self_, weights), all_weights)
     bb.append(inst)
 
     # model
     x = Symbol('x')
-    tf_float32 = Symbol('tf.float32')
-    placeholder = Symbol('tf.placeholder')
+    tf_placeholder = Symbol('tf.placeholder')
     None_ = Symbol('None')
-    inst = TFOperation(placeholder, [tf_float32, ListLiteral([None_, PyGetMember(self_, n_input)])], name=PyGetMember(self_, x))
+    inst = TFOperation(tf_placeholder, [tf_float32, ListLiteral([None_, PyGetMember(self_, n_input)])], name=PyGetMember(self_, x))
     bb.append(inst)
     hidden = Symbol('hidden')
     tf_add = Symbol('tf.add')
@@ -163,9 +218,9 @@ def model_build():
                        TFOperation(tf_add, [
                                    TFOperation(tf_matmul, [
                                                PyGetMember(self_, x), 
-                                               PyGetItem(PyGetMember(self_, weights), StringLiteral('w1'))
+                                               PyGetItem(PyGetMember(self_, weights), w1)
                                                ]), 
-                                   PyGetItem(PyGetMember(self_, weights), StringLiteral('b1'))
+                                   PyGetItem(PyGetMember(self_, weights), b1)
                                    ])
                        ], name=PyGetMember(self_, hidden))
     bb.append(inst)
@@ -173,9 +228,9 @@ def model_build():
     inst = TFOperation(tf_add, [
                        TFOperation(tf_matmul, [
                                    PyGetMember(self_, hidden),
-                                   PyGetItem(PyGetMember(self_, weights), StringLiteral('w2'))
+                                   PyGetItem(PyGetMember(self_, weights), w2)
                                    ]),
-                       PyGetItem(PyGetMember(self_, weights), StringLiteral('b2'))
+                       PyGetItem(PyGetMember(self_, weights), b2)
                        ], name=PyGetMember(self_, reconstruction))
     bb.append(inst)
 
