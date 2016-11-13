@@ -52,5 +52,8 @@ for epoch in range(training_epochs):
 
 end = time.time()
 
-print "Total cost: " + str(autoencoder.calc_total_cost(X_test))
-print "Total time (s): " + str(end - start)
+out = "Total cost: " + str(autoencoder.calc_total_cost(X_test)) + '\n'
+out = out + "Total time (s): " + str(end - start) + '\n'
+print out
+from log import *
+LOG('logs/autoencoder.txt', out)

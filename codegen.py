@@ -135,8 +135,35 @@ class PyGetItem(Op):
     def codegen(self):
         return self.array.codegen() + '[' + self.index.codegen() + ']'
 
-def codegen_bb(bb):
-    code = '# generate from basic block\n'
-    for i in bb:
-        code = code + i.codegen() + '\n'
-    return code
+class PyWith(Op):
+    def __init__(self, with_expr, block, as_expr=None, indent='    '):
+        self.with_expr = with_expr
+        self.block = block
+        self.as_expr = as_expr
+        self.indent = indent
+
+    def codegen(self):
+        code = 'with ' + self.with_expr.codegen() + ':\n'
+        for inst in self.block:
+            code = code + self.indent + inst.codegen() + '\n'
+        return code
+
+class BasicBlock(object):
+    def __init__(self, indent=''):
+        self._bb = []
+        self.indent = ''
+
+    def append(self, inst):
+        self._bb.append(inst)
+
+    def __len__(self):
+        return len(self._bb)
+
+    def __getitem__(self, position):
+        return self._bb[position]
+
+    def codegen(self):
+        code = '# generate from basic block\n'
+        for i in self._bb:
+            code = code + self.indent + i.codegen() + '\n'
+        return code

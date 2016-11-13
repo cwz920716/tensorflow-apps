@@ -1,4 +1,6 @@
+import sys
 from codegen import *
+from devices import *
 
 def model_build():
     n_input = Symbol('n_input')
@@ -6,7 +8,7 @@ def model_build():
     transfer_function = Symbol('transfer_function')
     optimizer = Symbol('optimizer')
     self_ = Symbol('self')
-    bb = []
+    bb = BasicBlock()
     inst = PyAssign(PyGetMember(self_, n_input), n_input)
     bb.append(inst)
     inst = PyAssign(PyGetMember(self_, n_hidden), n_hidden)
@@ -131,8 +133,17 @@ def model_build():
     inst = PyCall(PyGetMember(PyGetMember(self_, sess), run), [init]) 
     bb.append(inst)
 
-    # test
-    code = codegen_bb(bb)
-    print code
+    return bb
 
-model_build()
+print '# Usage: test_*.py [dev_type_string] [dev_id_string]'
+dev_string='/gpu:0'
+argc = len(sys.argv)
+if argc > 2:
+    dev_string = '/' + sys.argv[1] + ':' + sys.argv[2]
+    print '# dev_string=', dev_string
+
+bb = model_build()
+dev = Device(dev_string)
+op_placer = SingleDevicePlacer(dev)
+bb = op_placer.scanAndAssign(bb)
+print bb.codegen()
