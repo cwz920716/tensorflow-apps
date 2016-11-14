@@ -45,12 +45,19 @@ class TFOperation(Op):
         return code 
 
 class TFObject(Op):
-    def __init__(self, name, constructor='tf.Session'):
+    def __init__(self, name, args, constructor=Symbol('tf.Session')):
         self.name = name
-        self.constructor = 'tf.Session'
+        self.args = args
+        self.constructor = constructor
 
     def codegen(self):
-        code = self.name.codegen() + ' = ' + self.constructor + '()'
+        code = self.name.codegen() + ' = ' + self.constructor.codegen() + '('
+        if len(self.args) > 0:
+            code = code + self.args[0].codegen()
+            args_ = self.args[1:]
+            for arg in args_:
+                code = code + ', ' + arg.codegen()
+        code = code + ')'
         return code 
 
 class StringLiteral(object):

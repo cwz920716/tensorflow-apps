@@ -127,7 +127,17 @@ def model_build():
     inst = TFOperation(tf_initialize_all_variables, [], name=init)
     bb.append(inst)
     sess = Symbol('sess')
-    inst = TFObject(PyGetMember(self_, sess))
+    config = Symbol('config')
+    tf_ConfigProto = Symbol('tf.ConfigProto')
+    log_device_placement = Symbol('log_device_placement')
+    True_ = Symbol('True')
+    False_ = Symbol('False')
+    inst = TFObject(PyGetMember(self_, sess), [
+                    PyKeywordArg(config, PyCall(tf_ConfigProto, [
+                                                PyKeywordArg(log_device_placement, True_)
+                                                ])
+                                 )
+                    ])
     bb.append(inst)
     run = Symbol('run')
     inst = PyCall(PyGetMember(PyGetMember(self_, sess), run), [init]) 
